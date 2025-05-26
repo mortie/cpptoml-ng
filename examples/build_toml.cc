@@ -1,7 +1,7 @@
 #include <cpptoml.h>
 #include <iostream>
 
-int main(int argc, char* argv[])
+int main()
 {
     std::shared_ptr<cpptoml::table> root = cpptoml::make_table();
     root->insert("Integer", 1234L);
