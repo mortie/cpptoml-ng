@@ -7,6 +7,7 @@
 #ifndef CPPTOML_H
 #define CPPTOML_H
 
+#include <optional>
 #include <algorithm>
 #include <cassert>
 #include <clocale>
@@ -42,47 +43,8 @@ using string_to_base_map
 // such that static_cast can be used instead of dynamic_cast
 // #define CPPTOML_NO_RTTI
 
-template <class T>
-class option
-{
-  public:
-    option() : empty_{true}
-    {
-        // nothing
-    }
-
-    option(T value) : empty_{false}, value_(std::move(value))
-    {
-        // nothing
-    }
-
-    explicit operator bool() const
-    {
-        return !empty_;
-    }
-
-    const T& operator*() const
-    {
-        return value_;
-    }
-
-    const T* operator->() const
-    {
-        return &value_;
-    }
-
-    template <class U>
-    T value_or(U&& alternative) const
-    {
-        if (!empty_)
-            return value_;
-        return static_cast<T>(std::forward<U>(alternative));
-    }
-
-  private:
-    bool empty_;
-    T value_;
-};
+template<typename T>
+using option = std::optional<T>;
 
 struct local_date
 {
