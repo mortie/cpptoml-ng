@@ -22,20 +22,6 @@
 #include <unordered_map>
 #include <vector>
 
-#if __cplusplus > 201103L
-#define CPPTOML_DEPRECATED(reason) [[deprecated(reason)]]
-#elif defined(__clang__)
-#define CPPTOML_DEPRECATED(reason) __attribute__((deprecated(reason)))
-#elif defined(__GNUG__)
-#define CPPTOML_DEPRECATED(reason) __attribute__((deprecated))
-#elif defined(_MSC_VER)
-#if _MSC_VER < 1910
-#define CPPTOML_DEPRECATED(reason) __declspec(deprecated)
-#else
-#define CPPTOML_DEPRECATED(reason) [[deprecated(reason)]]
-#endif
-#endif
-
 namespace cpptoml
 {
 class writer; // forward declaration
@@ -143,12 +129,6 @@ struct offset_datetime : local_datetime, zone_offset
         return dt;
     }
 
-    CPPTOML_DEPRECATED("from_local has been renamed to from_zoned")
-    static inline struct offset_datetime from_local(const struct tm& t)
-    {
-        return from_zoned(t);
-    }
-
     static inline struct offset_datetime from_utc(const struct tm& t)
     {
         offset_datetime dt;
@@ -161,9 +141,6 @@ struct offset_datetime : local_datetime, zone_offset
         return dt;
     }
 };
-
-CPPTOML_DEPRECATED("datetime has been renamed to offset_datetime")
-typedef offset_datetime datetime;
 
 class fill_guard
 {
