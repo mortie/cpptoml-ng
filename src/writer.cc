@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cassert>
 #include <clocale>
+#include <iomanip>
 
 namespace cpptomlng
 {

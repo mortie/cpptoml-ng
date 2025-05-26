@@ -9,13 +9,13 @@
 
 #include <optional>
 #include <cstdint>
-#include <fstream>
 #include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 
 namespace cpptomlng
 {
@@ -1746,20 +1746,7 @@ class parser
  * Utility function to parse a file as a TOML file. Returns the root table.
  * Throws a parse_exception if the file cannot be opened.
  */
-inline std::shared_ptr<table> parse_file(const std::string& filename)
-{
-#if defined(BOOST_NOWIDE_FSTREAM_INCLUDED_HPP)
-    boost::nowide::ifstream file{filename.c_str()};
-#elif defined(NOWIDE_FSTREAM_INCLUDED_HPP)
-    nowide::ifstream file{filename.c_str()};
-#else
-    std::ifstream file{filename};
-#endif
-    if (!file.is_open())
-        throw parse_exception{filename + " could not be opened for parsing"};
-    parser p{file};
-    return p.parse();
-}
+std::shared_ptr<table> parse_file(const std::string& filename);
 
 template <class... Ts>
 struct value_accept;

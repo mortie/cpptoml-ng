@@ -1,6 +1,7 @@
 #include "cpptoml.h"
 
 #include <iomanip>
+#include <fstream>
 
 namespace cpptomlng
 {
@@ -99,5 +100,15 @@ std::ostream& operator<<(std::ostream& os, const zone_offset& zo)
 
     return os;
 }
+
+std::shared_ptr<table> parse_file(const std::string& filename)
+{
+    std::ifstream file{filename};
+    if (!file.is_open())
+        throw parse_exception{filename + " could not be opened for parsing"};
+    parser p{file};
+    return p.parse();
+}
+
 
 }
