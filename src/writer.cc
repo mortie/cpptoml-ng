@@ -8,13 +8,6 @@
 namespace cpptomlng
 {
 
-template <class T>
-inline void toml_writer::write(const T& v)
-{
-    stream_ << v;
-    has_naked_endline_ = false;
-}
-
 /**
  * Output a table element of the TOML tree
  */

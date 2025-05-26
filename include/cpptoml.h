@@ -16,7 +16,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <iosfwd>
+#include <iostream>
 
 namespace cpptomlng
 {
@@ -1647,7 +1647,11 @@ class toml_writer
     void write(char ch);
 
     template <class T>
-    void write(const T& v);
+    void write(const T& v)
+    {
+        stream_ << v;
+        has_naked_endline_ = false;
+    }
 
     /**
      * Write an endline out to the stream
