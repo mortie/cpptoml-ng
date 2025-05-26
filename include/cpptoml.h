@@ -15,7 +15,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <iostream>
+#include <iosfwd>
 
 namespace cpptomlng
 {
@@ -64,19 +64,13 @@ struct offset_datetime : local_datetime, zone_offset
 class fill_guard
 {
   public:
-    fill_guard(std::ostream& os) : os_(os), fill_{os.fill()}
-    {
-        // nothing
-    }
+    fill_guard(std::ostream& os);
 
-    ~fill_guard()
-    {
-        os_.fill(fill_);
-    }
+    ~fill_guard();
 
   private:
     std::ostream& os_;
-    std::ostream::char_type fill_;
+    char fill_;
 };
 
 std::ostream& operator<<(std::ostream& os, const local_date& dt);
@@ -85,17 +79,9 @@ std::ostream& operator<<(std::ostream& os, const local_time& ltime);
 
 std::ostream& operator<<(std::ostream& os, const zone_offset& zo);
 
-inline std::ostream& operator<<(std::ostream& os, const local_datetime& dt)
-{
-    return os << static_cast<const local_date&>(dt) << "T"
-              << static_cast<const local_time&>(dt);
-}
+std::ostream& operator<<(std::ostream& os, const local_datetime& dt);
 
-inline std::ostream& operator<<(std::ostream& os, const offset_datetime& dt)
-{
-    return os << static_cast<const local_datetime&>(dt)
-              << static_cast<const zone_offset&>(dt);
-}
+std::ostream& operator<<(std::ostream& os, const offset_datetime& dt);
 
 template <class T, class... Ts>
 struct is_one_of;
@@ -1434,72 +1420,6 @@ inline bool is_hex(char c)
 }
 
 /**
- * Helper object for consuming expected characters.
- */
-template <class OnError>
-class consumer
-{
-  public:
-    consumer(std::string::iterator& it, const std::string::iterator& end,
-             OnError&& on_error)
-        : it_(it), end_(end), on_error_(std::forward<OnError>(on_error))
-    {
-        // nothing
-    }
-
-    void operator()(char c)
-    {
-        if (it_ == end_ || *it_ != c)
-            on_error_();
-        ++it_;
-    }
-
-    template <std::size_t N>
-    void operator()(const char (&str)[N])
-    {
-        std::for_each(std::begin(str), std::end(str) - 1,
-                      [&](char c) { (*this)(c); });
-    }
-
-    void eat_or(char a, char b)
-    {
-        if (it_ == end_ || (*it_ != a && *it_ != b))
-            on_error_();
-        ++it_;
-    }
-
-    int eat_digits(int len)
-    {
-        int val = 0;
-        for (int i = 0; i < len; ++i)
-        {
-            if (!is_number(*it_) || it_ == end_)
-                on_error_();
-            val = 10 * val + (*it_++ - '0');
-        }
-        return val;
-    }
-
-    void error()
-    {
-        on_error_();
-    }
-
-  private:
-    std::string::iterator& it_;
-    const std::string::iterator& end_;
-    OnError on_error_;
-};
-
-template <class OnError>
-consumer<OnError> make_consumer(std::string::iterator& it,
-                                const std::string::iterator& end,
-                                OnError&& on_error)
-{
-    return consumer<OnError>(it, end, std::forward<OnError>(on_error));
-}
-
-/**
  * The parser class.
  */
 class parser
@@ -1527,7 +1447,7 @@ class parser
 #elif defined __GNUC__
     __attribute__((noreturn))
 #endif
-        void throw_parse_exception(const std::string& err)
+    void throw_parse_exception(const std::string& err)
     {
         throw parse_exception{err, line_number_};
     }
@@ -1548,36 +1468,7 @@ class parser
     template <class KeyEndFinder, class KeyPartHandler>
     std::string
     parse_key(std::string::iterator& it, const std::string::iterator& end,
-              KeyEndFinder&& key_end, KeyPartHandler&& key_part_handler)
-    {
-        // parse the key as a series of one or more simple-keys joined with '.'
-        while (it != end && !key_end(*it))
-        {
-            auto part = parse_simple_key(it, end);
-            consume_whitespace(it, end);
-
-            if (it == end || key_end(*it))
-            {
-                return part;
-            }
-
-            if (*it != '.')
-            {
-                std::string errmsg{"Unexpected character in key: "};
-                errmsg += '"';
-                errmsg += *it;
-                errmsg += '"';
-                throw_parse_exception(errmsg);
-            }
-
-            key_part_handler(part);
-
-            // consume the dot
-            ++it;
-        }
-
-        throw_parse_exception("Unexpected end of key");
-    }
+              KeyEndFinder&& key_end, KeyPartHandler&& key_part_handler);
 
     std::string parse_simple_key(std::string::iterator& it,
                                  const std::string::iterator& end);
@@ -1666,55 +1557,12 @@ class parser
 
     template <class Value>
     std::shared_ptr<array> parse_value_array(std::string::iterator& it,
-                                             std::string::iterator& end)
-    {
-        auto arr = make_array();
-        while (it != end && *it != ']')
-        {
-            auto val = parse_value(it, end);
-            if (auto v = val->as<Value>())
-                arr->get().push_back(val);
-            else
-                throw_parse_exception("Arrays must be homogeneous");
-            skip_whitespace_and_comments(it, end);
-            if (*it != ',')
-                break;
-            ++it;
-            skip_whitespace_and_comments(it, end);
-        }
-        if (it != end)
-            ++it;
-        return arr;
-    }
+                                             std::string::iterator& end);
 
     template <class Object, class Function>
     std::shared_ptr<Object> parse_object_array(Function&& fun, char delim,
                                                std::string::iterator& it,
-                                               std::string::iterator& end)
-    {
-        auto arr = detail::make_element<Object>();
-
-        while (it != end && *it != ']')
-        {
-            if (*it != delim)
-                throw_parse_exception("Unexpected character in array");
-
-            arr->get().push_back(((*this).*fun)(it, end));
-            skip_whitespace_and_comments(it, end);
-
-            if (it == end || *it != ',')
-                break;
-
-            ++it;
-            skip_whitespace_and_comments(it, end);
-        }
-
-        if (it == end || *it != ']')
-            throw_parse_exception("Unterminated array");
-
-        ++it;
-        return arr;
-    }
+                                               std::string::iterator& end);
 
     std::shared_ptr<table> parse_inline_table(std::string::iterator& it,
                                               std::string::iterator& end);
@@ -1906,12 +1754,10 @@ class toml_writer
     /**
      * Write a value out to the stream.
      */
+    void write(char ch);
+
     template <class T>
-    void write(const T& v)
-    {
-        stream_ << v;
-        has_naked_endline_ = false;
-    }
+    void write(const T& v);
 
     /**
      * Write an endline out to the stream
@@ -1962,6 +1808,8 @@ inline std::ostream& operator<<(std::ostream& stream, const array& a)
 }
 } // namespace cpptomlng
 
+#ifndef CPPTOMLNG_NO_ALIAS
 namespace cpptoml = cpptomlng;
+#endif
 
 #endif // CPPTOMLNG_H

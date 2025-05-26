@@ -37,6 +37,14 @@ struct offset_datetime offset_datetime::from_utc(const struct tm& t)
     return dt;
 }
 
+fill_guard::fill_guard(std::ostream& os) : os_(os), fill_(os.fill())
+{}
+
+fill_guard::~fill_guard()
+{
+    os_.fill(fill_);
+}
+
 std::ostream& operator<<(std::ostream& os, const local_date& dt)
 {
     fill_guard g{os};
@@ -71,6 +79,18 @@ std::ostream& operator<<(std::ostream& os, const local_time& ltime)
     }
 
     return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const local_datetime& dt)
+{
+    return os << static_cast<const local_date&>(dt) << "T"
+              << static_cast<const local_time&>(dt);
+}
+
+std::ostream& operator<<(std::ostream& os, const offset_datetime& dt)
+{
+    return os << static_cast<const local_datetime&>(dt)
+              << static_cast<const zone_offset&>(dt);
 }
 
 std::ostream& operator<<(std::ostream& os, const zone_offset& zo)

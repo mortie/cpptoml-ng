@@ -39,6 +39,72 @@ std::istream& getline(std::istream& input, std::string& line)
         line.push_back(static_cast<char>(c));
     }
 }
+
+/**
+ * Helper object for consuming expected characters.
+ */
+template <class OnError>
+class consumer
+{
+  public:
+    consumer(std::string::iterator& it, const std::string::iterator& end,
+             OnError&& on_error)
+        : it_(it), end_(end), on_error_(std::forward<OnError>(on_error))
+    {
+        // nothing
+    }
+
+    void operator()(char c)
+    {
+        if (it_ == end_ || *it_ != c)
+            on_error_();
+        ++it_;
+    }
+
+    template <std::size_t N>
+    void operator()(const char (&str)[N])
+    {
+        std::for_each(std::begin(str), std::end(str) - 1,
+                      [&](char c) { (*this)(c); });
+    }
+
+    void eat_or(char a, char b)
+    {
+        if (it_ == end_ || (*it_ != a && *it_ != b))
+            on_error_();
+        ++it_;
+    }
+
+    int eat_digits(int len)
+    {
+        int val = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            if (!is_number(*it_) || it_ == end_)
+                on_error_();
+            val = 10 * val + (*it_++ - '0');
+        }
+        return val;
+    }
+
+    void error()
+    {
+        on_error_();
+    }
+
+  private:
+    std::string::iterator& it_;
+    const std::string::iterator& end_;
+    OnError on_error_;
+};
+
+template <class OnError>
+consumer<OnError> make_consumer(std::string::iterator& it,
+                                const std::string::iterator& end,
+                                OnError&& on_error)
+{
+    return consumer<OnError>(it, end, std::forward<OnError>(on_error));
+}
 } // namespace detail
 
 std::shared_ptr<table> parser::parse()
@@ -263,7 +329,7 @@ void parser::parse_table_array(std::string::iterator& it,
     key_part_handler(parse_key(it, end, key_end, key_part_handler));
 
     // consume the last "]]"
-    auto eat = make_consumer(it, end, [this]() {
+    auto eat = detail::make_consumer(it, end, [this]() {
         throw_parse_exception("Unterminated table array name");
     });
     eat(']');
@@ -315,6 +381,39 @@ void parser::parse_key_value(std::string::iterator& it, std::string::iterator& e
     consume_whitespace(it, end);
 }
 
+template <class KeyEndFinder, class KeyPartHandler>
+inline std::string
+parser::parse_key(std::string::iterator& it, const std::string::iterator& end,
+          KeyEndFinder&& key_end, KeyPartHandler&& key_part_handler)
+{
+    // parse the key as a series of one or more simple-keys joined with '.'
+    while (it != end && !key_end(*it))
+    {
+        auto part = parse_simple_key(it, end);
+        consume_whitespace(it, end);
+
+        if (it == end || key_end(*it))
+        {
+            return part;
+        }
+
+        if (*it != '.')
+        {
+            std::string errmsg{"Unexpected character in key: "};
+            errmsg += '"';
+            errmsg += *it;
+            errmsg += '"';
+            throw_parse_exception(errmsg);
+        }
+
+        key_part_handler(part);
+
+        // consume the dot
+        ++it;
+    }
+
+    throw_parse_exception("Unexpected end of key");
+}
 
 std::string parser::parse_simple_key(std::string::iterator& it,
                              const std::string::iterator& end)
@@ -943,7 +1042,7 @@ std::shared_ptr<value<double>> parser::parse_float(std::string::iterator& it,
 std::shared_ptr<value<bool>> parser::parse_bool(std::string::iterator& it,
                                         const std::string::iterator& end)
 {
-    auto eat = make_consumer(it, end, [this]() {
+    auto eat = detail::make_consumer(it, end, [this]() {
         throw_parse_exception("Attempted to parse invalid boolean value");
     });
 
@@ -1008,7 +1107,7 @@ local_time parser::read_time(std::string::iterator& it,
 {
     auto time_end = find_end_of_time(it, end);
 
-    auto eat = make_consumer(
+    auto eat = detail::make_consumer(
         it, time_end, [&]() { throw_parse_exception("Malformed time"); });
 
     local_time ltime;
@@ -1047,7 +1146,7 @@ std::shared_ptr<base> parser::parse_date(std::string::iterator& it,
 {
     auto date_end = find_end_of_date(it, end);
 
-    auto eat = make_consumer(
+    auto eat = detail::make_consumer(
         it, date_end, [&]() { throw_parse_exception("Malformed date"); });
 
     local_date ldate;
@@ -1147,6 +1246,60 @@ std::shared_ptr<base> parser::parse_array(std::string::iterator& it,
         default:
             throw_parse_exception("Unable to parse array");
     }
+}
+
+template <class Value>
+inline std::shared_ptr<array>
+parser::parse_value_array(std::string::iterator& it,
+                          std::string::iterator& end)
+{
+    auto arr = make_array();
+    while (it != end && *it != ']')
+    {
+        auto val = parse_value(it, end);
+        if (auto v = val->as<Value>())
+            arr->get().push_back(val);
+        else
+            throw_parse_exception("Arrays must be homogeneous");
+        skip_whitespace_and_comments(it, end);
+        if (*it != ',')
+            break;
+        ++it;
+        skip_whitespace_and_comments(it, end);
+    }
+    if (it != end)
+        ++it;
+    return arr;
+}
+
+template <class Object, class Function>
+inline std::shared_ptr<Object>
+parser::parse_object_array(Function&& fun, char delim,
+                           std::string::iterator& it,
+                           std::string::iterator& end)
+{
+    auto arr = detail::make_element<Object>();
+
+    while (it != end && *it != ']')
+    {
+        if (*it != delim)
+            throw_parse_exception("Unexpected character in array");
+
+        arr->get().push_back(((*this).*fun)(it, end));
+        skip_whitespace_and_comments(it, end);
+
+        if (it == end || *it != ',')
+            break;
+
+        ++it;
+        skip_whitespace_and_comments(it, end);
+    }
+
+    if (it == end || *it != ']')
+        throw_parse_exception("Unterminated array");
+
+    ++it;
+    return arr;
 }
 
 std::shared_ptr<table> parser::parse_inline_table(std::string::iterator& it,
