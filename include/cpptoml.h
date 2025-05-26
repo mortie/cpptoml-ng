@@ -4,8 +4,8 @@
  * @date May 2013
  */
 
-#ifndef CPPTOML_H
-#define CPPTOML_H
+#ifndef CPPTOMLNG_H
+#define CPPTOMLNG_H
 
 #include <optional>
 #include <cstdint>
@@ -17,7 +17,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace cpptoml
+namespace cpptomlng
 {
 class writer; // forward declaration
 class base;   // forward declaration
@@ -345,7 +345,7 @@ class value : public base
 
     template <class U>
     friend std::shared_ptr<typename value_traits<U>::type>
-    cpptoml::make_value(U&& val);
+    cpptomlng::make_value(U&& val);
 
   public:
     static_assert(valid_value<T>::value, "invalid value type");
@@ -1973,5 +1973,8 @@ inline std::ostream& operator<<(std::ostream& stream, const array& a)
     a.accept(writer);
     return stream;
 }
-} // namespace cpptoml
-#endif // CPPTOML_H
+} // namespace cpptomlng
+
+namespace cpptoml = cpptomlng;
+
+#endif // CPPTOMLNG_H

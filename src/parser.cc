@@ -3,7 +3,7 @@
 #include <sstream>
 #include <cassert>
 
-namespace cpptoml
+namespace cpptomlng
 {
 
 // replacement for std::getline to handle incorrectly line-ended files

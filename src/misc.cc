@@ -2,7 +2,7 @@
 
 #include <iomanip>
 
-namespace cpptoml
+namespace cpptomlng
 {
 
 struct offset_datetime offset_datetime::from_zoned(const struct tm& t)

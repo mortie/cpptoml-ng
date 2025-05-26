@@ -4,7 +4,7 @@
 #include <cassert>
 #include <clocale>
 
-namespace cpptoml
+namespace cpptomlng
 {
 
 /**
