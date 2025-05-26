@@ -6,6 +6,16 @@
 namespace cpptomlng
 {
 
+inline bool is_number(char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+inline bool is_hex(char c)
+{
+    return is_number(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
 // replacement for std::getline to handle incorrectly line-ended files
 // https://stackoverflow.com/questions/6089231/getting-std-ifstream-to-handle-lf-cr-and-crlf
 namespace detail

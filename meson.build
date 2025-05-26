@@ -10,6 +10,7 @@ cpptoml_lib = library(
   'cpptoml',
   'src/misc.cc',
   'src/parser.cc',
+  'src/value.cc',
   'src/writer.cc',
   include_directories: 'include',
 )

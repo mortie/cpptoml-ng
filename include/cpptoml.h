@@ -216,7 +216,7 @@ struct array_of_trait<array>
 
 template <class T>
 inline std::shared_ptr<typename value_traits<T>::type> make_value(T&& val);
-inline std::shared_ptr<array> make_array();
+std::shared_ptr<array> make_array();
 
 namespace detail
 {
@@ -224,8 +224,8 @@ template <class T>
 inline std::shared_ptr<T> make_element();
 }
 
-inline std::shared_ptr<table> make_table();
-inline std::shared_ptr<table_array> make_table_array(bool is_inline = false);
+std::shared_ptr<table> make_table();
+std::shared_ptr<table_array> make_table_array(bool is_inline = false);
 
 /**
  * A generic base TOML value used for type erasure.
@@ -549,19 +549,7 @@ class array : public base
      * Obtains an array of arrays. Note that elements may be nullptr
      * if they cannot be converted to a array.
      */
-    std::vector<std::shared_ptr<array>> nested_array() const
-    {
-        std::vector<std::shared_ptr<array>> result(values_.size());
-
-        std::transform(values_.begin(), values_.end(), result.begin(),
-                       [&](std::shared_ptr<base> v) -> std::shared_ptr<array> {
-                           if (v->is_array())
-                               return std::static_pointer_cast<array>(v);
-                           return std::shared_ptr<array>{};
-                       });
-
-        return result;
-    }
+    std::vector<std::shared_ptr<array>> nested_array() const;
 
     /**
      * Add a value to the end of the array
@@ -582,17 +570,7 @@ class array : public base
     /**
      * Add an array to the end of the array
      */
-    void push_back(const std::shared_ptr<array>& val)
-    {
-        if (values_.empty() || values_[0]->is_array())
-        {
-            values_.push_back(val);
-        }
-        else
-        {
-            throw array_exception{"Arrays must be homogenous."};
-        }
-    }
+    void push_back(const std::shared_ptr<array>& val);
 
     /**
      * Convenience function for adding a simple element to the end
@@ -623,17 +601,7 @@ class array : public base
     /**
      * Insert an array into the array
      */
-    iterator insert(iterator position, const std::shared_ptr<array>& value)
-    {
-        if (values_.empty() || values_[0]->is_array())
-        {
-            return values_.insert(position, value);
-        }
-        else
-        {
-            throw array_exception{"Arrays must be homogenous."};
-        }
-    }
+    iterator insert(iterator position, const std::shared_ptr<array>& value);
 
     /**
      * Convenience function for inserting a simple element in the array
@@ -684,18 +652,7 @@ class array : public base
     std::vector<std::shared_ptr<base>> values_;
 };
 
-inline std::shared_ptr<array> make_array()
-{
-    struct make_shared_enabler : public array
-    {
-        make_shared_enabler()
-        {
-            // nothing
-        }
-    };
-
-    return std::make_shared<make_shared_enabler>();
-}
+std::shared_ptr<array> make_array();
 
 namespace detail
 {
@@ -848,18 +805,7 @@ class table_array : public base
     const bool is_inline_ = false;
 };
 
-inline std::shared_ptr<table_array> make_table_array(bool is_inline)
-{
-    struct make_shared_enabler : public table_array
-    {
-        make_shared_enabler(bool mse_is_inline) : table_array(mse_is_inline)
-        {
-            // nothing
-        }
-    };
-
-    return std::make_shared<make_shared_enabler>(is_inline);
-}
+std::shared_ptr<table_array> make_table_array(bool is_inline);
 
 namespace detail
 {
@@ -1226,19 +1172,7 @@ class table : public base
     table& operator=(const table& rhs) = delete;
 
     std::vector<std::string> split(const std::string& value,
-                                   char separator) const
-    {
-        std::vector<std::string> result;
-        std::string::size_type p = 0;
-        std::string::size_type q;
-        while ((q = value.find(separator, p)) != std::string::npos)
-        {
-            result.emplace_back(value, p, q - p);
-            p = q + 1;
-        }
-        result.emplace_back(value, p);
-        return result;
-    }
+                                   char separator) const;
 
     // If output parameter p is specified, fill it with the pointer to the
     // specified entry and throw std::out_of_range if it couldn't be found.
@@ -1246,31 +1180,7 @@ class table : public base
     // Otherwise, just return true if the entry could be found or false
     // otherwise and do not throw.
     bool resolve_qualified(const std::string& key,
-                           std::shared_ptr<base>* p = nullptr) const
-    {
-        auto parts = split(key, '.');
-        auto last_key = parts.back();
-        parts.pop_back();
-
-        auto cur_table = this;
-        for (const auto& part : parts)
-        {
-            cur_table = cur_table->get_table(part).get();
-            if (!cur_table)
-            {
-                if (!p)
-                    return false;
-
-                throw std::out_of_range{key + " is not a valid key"};
-            }
-        }
-
-        if (!p)
-            return cur_table->map_.count(last_key) != 0;
-
-        *p = cur_table->map_.at(last_key);
-        return true;
-    }
+                           std::shared_ptr<base>* p = nullptr) const;
 
     string_to_base_map map_;
 };
@@ -1339,18 +1249,7 @@ table::get_qualified_array_of<array>(const std::string& key) const
     return {};
 }
 
-std::shared_ptr<table> make_table()
-{
-    struct make_shared_enabler : public table
-    {
-        make_shared_enabler()
-        {
-            // nothing
-        }
-    };
-
-    return std::make_shared<make_shared_enabler>();
-}
+std::shared_ptr<table> make_table();
 
 namespace detail
 {
@@ -1408,16 +1307,6 @@ class parse_exception : public std::runtime_error
     {
     }
 };
-
-inline bool is_number(char c)
-{
-    return c >= '0' && c <= '9';
-}
-
-inline bool is_hex(char c)
-{
-    return is_number(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-}
 
 /**
  * The parser class.
