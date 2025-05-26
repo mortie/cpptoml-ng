@@ -7,6 +7,7 @@
 #ifndef CPPTOMLNG_H
 #define CPPTOMLNG_H
 
+#include <algorithm>
 #include <optional>
 #include <cstdint>
 #include <limits>
