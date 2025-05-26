@@ -28,20 +28,10 @@ namespace cpptoml
 {
 class writer; // forward declaration
 class base;   // forward declaration
-#if defined(CPPTOML_USE_MAP)
-// a std::map will ensure that entries a sorted, albeit at a slight
-// performance penalty relative to the (default) unordered_map
-using string_to_base_map = std::map<std::string, std::shared_ptr<base>>;
-#else
 // by default an unordered_map is used for best performance as the
 // toml specification does not require entries to be sorted
 using string_to_base_map
     = std::unordered_map<std::string, std::shared_ptr<base>>;
-#endif
-
-// if defined, `base` will retain type information in form of an enum class
-// such that static_cast can be used instead of dynamic_cast
-// #define CPPTOML_NO_RTTI
 
 template<typename T>
 using option = std::optional<T>;
@@ -343,95 +333,6 @@ inline std::shared_ptr<T> make_element();
 inline std::shared_ptr<table> make_table();
 inline std::shared_ptr<table_array> make_table_array(bool is_inline = false);
 
-#if defined(CPPTOML_NO_RTTI)
-/// Base type used to store underlying data type explicitly if RTTI is disabled
-enum class base_type
-{
-    NONE,
-    STRING,
-    LOCAL_TIME,
-    LOCAL_DATE,
-    LOCAL_DATETIME,
-    OFFSET_DATETIME,
-    INT,
-    FLOAT,
-    BOOL,
-    TABLE,
-    ARRAY,
-    TABLE_ARRAY
-};
-
-/// Type traits class to convert C++ types to enum member
-template <class T>
-struct base_type_traits;
-
-template <>
-struct base_type_traits<std::string>
-{
-    static const base_type type = base_type::STRING;
-};
-
-template <>
-struct base_type_traits<local_time>
-{
-    static const base_type type = base_type::LOCAL_TIME;
-};
-
-template <>
-struct base_type_traits<local_date>
-{
-    static const base_type type = base_type::LOCAL_DATE;
-};
-
-template <>
-struct base_type_traits<local_datetime>
-{
-    static const base_type type = base_type::LOCAL_DATETIME;
-};
-
-template <>
-struct base_type_traits<offset_datetime>
-{
-    static const base_type type = base_type::OFFSET_DATETIME;
-};
-
-template <>
-struct base_type_traits<int64_t>
-{
-    static const base_type type = base_type::INT;
-};
-
-template <>
-struct base_type_traits<double>
-{
-    static const base_type type = base_type::FLOAT;
-};
-
-template <>
-struct base_type_traits<bool>
-{
-    static const base_type type = base_type::BOOL;
-};
-
-template <>
-struct base_type_traits<table>
-{
-    static const base_type type = base_type::TABLE;
-};
-
-template <>
-struct base_type_traits<array>
-{
-    static const base_type type = base_type::ARRAY;
-};
-
-template <>
-struct base_type_traits<table_array>
-{
-    static const base_type type = base_type::TABLE_ARRAY;
-};
-#endif
-
 /**
  * A generic base TOML value used for type erasure.
  */
@@ -516,28 +417,11 @@ class base : public std::enable_shared_from_this<base>
     template <class Visitor, class... Args>
     void accept(Visitor&& visitor, Args&&... args) const;
 
-#if defined(CPPTOML_NO_RTTI)
-    base_type type() const
-    {
-        return type_;
-    }
-
-  protected:
-    base(const base_type t) : type_(t)
-    {
-        // nothing
-    }
-
-  private:
-    const base_type type_ = base_type::NONE;
-
-#else
   protected:
     base()
     {
         // nothing
     }
-#endif
 };
 
 /**
@@ -593,15 +477,9 @@ class value : public base
     /**
      * Constructs a value from the given data.
      */
-#if defined(CPPTOML_NO_RTTI)
-    value(const T& val) : base(base_type_traits<T>::type), data_(val)
-    {
-    }
-#else
     value(const T& val) : data_(val)
     {
     }
-#endif
 
     value(const value& val) = delete;
     value& operator=(const value& val) = delete;
@@ -619,14 +497,7 @@ std::shared_ptr<typename value_traits<T>::type> make_value(T&& val)
 template <class T>
 inline std::shared_ptr<value<T>> base::as()
 {
-#if defined(CPPTOML_NO_RTTI)
-    if (type() == base_type_traits<T>::type)
-        return std::static_pointer_cast<value<T>>(shared_from_this());
-    else
-        return nullptr;
-#else
     return std::dynamic_pointer_cast<value<T>>(shared_from_this());
-#endif
 }
 
 // special case value<double> to allow getting an integer parameter as a
@@ -634,22 +505,11 @@ inline std::shared_ptr<value<T>> base::as()
 template <>
 inline std::shared_ptr<value<double>> base::as()
 {
-#if defined(CPPTOML_NO_RTTI)
-    if (type() == base_type::FLOAT)
-        return std::static_pointer_cast<value<double>>(shared_from_this());
-
-    if (type() == base_type::INT)
-    {
-        auto v = std::static_pointer_cast<value<int64_t>>(shared_from_this());
-        return make_value<double>(static_cast<double>(v->get()));
-    }
-#else
     if (auto v = std::dynamic_pointer_cast<value<double>>(shared_from_this()))
         return v;
 
     if (auto v = std::dynamic_pointer_cast<value<int64_t>>(shared_from_this()))
         return make_value<double>(static_cast<double>(v->get()));
-#endif
 
     return nullptr;
 }
@@ -657,14 +517,7 @@ inline std::shared_ptr<value<double>> base::as()
 template <class T>
 inline std::shared_ptr<const value<T>> base::as() const
 {
-#if defined(CPPTOML_NO_RTTI)
-    if (type() == base_type_traits<T>::type)
-        return std::static_pointer_cast<const value<T>>(shared_from_this());
-    else
-        return nullptr;
-#else
     return std::dynamic_pointer_cast<const value<T>>(shared_from_this());
-#endif
 }
 
 // special case value<double> to allow getting an integer parameter as a
@@ -672,19 +525,6 @@ inline std::shared_ptr<const value<T>> base::as() const
 template <>
 inline std::shared_ptr<const value<double>> base::as() const
 {
-#if defined(CPPTOML_NO_RTTI)
-    if (type() == base_type::FLOAT)
-        return std::static_pointer_cast<const value<double>>(
-            shared_from_this());
-
-    if (type() == base_type::INT)
-    {
-        auto v = as<int64_t>();
-        // the below has to be a non-const value<double> due to a bug in
-        // libc++: https://llvm.org/bugs/show_bug.cgi?id=18843
-        return make_value<double>(static_cast<double>(v->get()));
-    }
-#else
     if (auto v
         = std::dynamic_pointer_cast<const value<double>>(shared_from_this()))
         return v;
@@ -695,7 +535,6 @@ inline std::shared_ptr<const value<double>> base::as() const
         // libc++: https://llvm.org/bugs/show_bug.cgi?id=18843
         return make_value<double>(static_cast<double>(v->get()));
     }
-#endif
 
     return nullptr;
 }
@@ -937,14 +776,7 @@ class array : public base
     }
 
   private:
-#if defined(CPPTOML_NO_RTTI)
-    array() : base(base_type::ARRAY)
-    {
-        // empty
-    }
-#else
     array() = default;
-#endif
 
     template <class InputIterator>
     array(InputIterator begin, InputIterator end) : values_{begin, end}
@@ -1110,18 +942,10 @@ class table_array : public base
     }
 
   private:
-#if defined(CPPTOML_NO_RTTI)
-    table_array(bool is_inline = false)
-        : base(base_type::TABLE_ARRAY), is_inline_(is_inline)
-    {
-        // nothing
-    }
-#else
     table_array(bool is_inline = false) : is_inline_(is_inline)
     {
         // nothing
     }
-#endif
 
     table_array(const table_array& obj) = delete;
     table_array& operator=(const table_array& rhs) = delete;
@@ -1499,17 +1323,10 @@ class table : public base
     }
 
   private:
-#if defined(CPPTOML_NO_RTTI)
-    table() : base(base_type::TABLE)
-    {
-        // nothing
-    }
-#else
     table()
     {
         // nothing
     }
-#endif
 
     table(const table& obj) = delete;
     table& operator=(const table& rhs) = delete;
