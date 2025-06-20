@@ -13,6 +13,7 @@ cpptoml_lib = library(
   'src/value.cc',
   'src/writer.cc',
   include_directories: 'include',
+  install: true,
 )
 
 cpptoml_dep = declare_dependency(
