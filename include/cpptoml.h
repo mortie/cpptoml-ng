@@ -638,6 +638,14 @@ class array : public base
         values_.reserve(n);
     }
 
+    /**
+     * Get the length of the array.
+     */
+    size_t size()
+    {
+        return values_.size();
+    }
+
   private:
     array() = default;
 
@@ -781,6 +789,14 @@ class table_array : public base
     void reserve(size_type n)
     {
         array_.reserve(n);
+    }
+
+    /**
+     * Get the length of the array.
+     */
+    size_t size()
+    {
+        return array_.size();
     }
 
     /**
@@ -1161,6 +1177,14 @@ class table : public base
     void erase(const std::string& key)
     {
         map_.erase(key);
+    }
+
+    /**
+     * Get the number of entries in the table.
+     */
+    size_t size()
+    {
+        return map_.size();
     }
 
   private:
